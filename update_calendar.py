@@ -113,9 +113,17 @@ for i in range(6):
             data = json.loads(response.read().decode('utf-8'))
             for ev in data.get('items', []):
                 start = ev.get('start', {}).get('dateTime') or ev.get('start', {}).get('date')
+                end = ev.get('end', {}).get('dateTime') or ev.get('end', {}).get('date')
                 day = start[:10]
                 if day not in events: events[day] = []
-                time_str = f"{start[11:16]} " if 'dateTime' in ev.get('start', {}) else ""
+                
+                # 新增：同時處理開始與結束時間
+                time_str = ""
+                if 'dateTime' in ev.get('start', {}):
+                    t1 = start[11:16]
+                    t2 = end[11:16] if end else ""
+                    time_str = f"{t1}-{t2} " if t2 else f"{t1} "
+                
                 events[day].append((time_str, ev.get('summary', '(No title)')))
     except Exception as e: print(f"API Error: {e}")
     
