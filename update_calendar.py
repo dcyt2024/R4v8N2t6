@@ -19,6 +19,8 @@ GRID_COLS = 7
 CELL_WIDTH = SCREEN_WIDTH // GRID_COLS
 CELL_HEIGHT = (SCREEN_HEIGHT - TOPBAR_HEIGHT - DOW_HEIGHT) // GRID_ROWS
 
+LOCAL_TZ = timezone(timedelta(hours=8))
+
 # ==================== 2. 安全字型載入 ====================
 def get_scaled_font(font_size):
     font_sources = [
@@ -40,15 +42,15 @@ def get_scaled_font(font_size):
                 continue
     return ImageFont.load_default(size=font_size)
 
-# 🌟 大字體調整：確保字體夠大清晰
 font_title = get_scaled_font(85)   
 font_week = get_scaled_font(56)    
-font_date = get_scaled_font(56)    # 日期字體
-font_event = get_scaled_font(44)   # 🌟 行程文字放大到 44px
+font_date = get_scaled_font(52)    
+font_event = get_scaled_font(26)   
+font_info = get_scaled_font(24)    
 
 # ==================== 3. Google API 資料讀取 ====================
 CALENDAR_ID = 'dcyt122024@gmail.com'
-API_KEY = 'AIzaSyAYBpOB6UoMYeAAmwTM_1KdYEzwtv6zXiE'
+API_KEY = 'AKfycbyiMdCmH_4MoCpOGkt4flb0luLreIjWh8NA3g7pEmbFaRbuG9P18kNF1Fqmy0L8sbjR'
 
 calendar_events = {}
 try:
@@ -68,10 +70,7 @@ try:
     req = urllib.request.Request(final_url, headers={'User-Agent': 'Mozilla/5.0'})
     with urllib.request.urlopen(req) as response:
         data = json.loads(response.read().decode('utf-8'))
-        
-        # 偵測是否成功拿到 items
         items = data.get('items', [])
-        print(f"成功連線！拿到 {len(items)} 個原始事件。")
         
         for ev in items:
             start = ev.get('start', {}).get('dateTime') or ev.get('start', {}).get('date')
@@ -81,38 +80,40 @@ try:
             if not start: 
                 continue
             
-            # 安全截取 YYYY-MM-DD
             day_key = start[:10]
-            
             time_str = ""
             if 'dateTime' in ev.get('start', {}):
-                try:
-                    # 考慮到可能帶有時區，安全切取時分
-                    # "2026-07-12T14:00:00+08:00" -> "14:00"
-                    t1 = start[11:16]
-                    t2 = end[11:16] if end else ""
-                    time_str = f"{t1}-{t2} " if t2 else f"{t1} "
-                except Exception as e:
-                    time_str = ""
+                t1 = start[11:16]
+                t2 = end[11:16] if end else ""
+                time_str = f"{t1}-{t2} " if t2 else f"{t1} "
                 
             if day_key not in calendar_events:
                 calendar_events[day_key] = []
             calendar_events[day_key].append((time_str, summary))
-            
-    print(f"解析完成，共有 {len(calendar_events)} 天有排程。內容：", calendar_events)
 except Exception as e:
-    # 🌟 這裡如果報錯，會在畫面直接印出詳細原因，方便我們除錯！
-    print(f"❌ 發生致命錯誤!! Google API 讀取失敗: {e}")
+    print(f"API Error: {e}")
 
-# ==================== 4. 繪製與排版 ====================
-image = Image.new("1", (SCREEN_WIDTH, SCREEN_HEIGHT), 1)
+# ==================== 4. 繪製與排版 (切換為灰階模式) ====================
+# 🌟 將模式從 "1" 改為 "L"，允許使用 0 (黑) ~ 255 (白) 之間的灰色
+image = Image.new("L", (SCREEN_WIDTH, SCREEN_HEIGHT), 255) # 255 是純白背景
 draw = ImageDraw.Draw(image)
+
+# 顏色定義 (0為純黑，160為優雅淺灰，210為格線淡灰)
+COLOR_BLACK = 0
+COLOR_GRAY = 160
+COLOR_LINE = 210
 
 # 1. Topbar：July 2026 居中
 title_text = "July 2026"
 title_w = draw.textlength(title_text, font=font_title)
-draw.text(((SCREEN_WIDTH - title_w) // 2, (TOPBAR_HEIGHT - 85) // 2), title_text, fill=0, font=font_title)
-draw.line([(0, TOPBAR_HEIGHT), (SCREEN_WIDTH, TOPBAR_HEIGHT)], fill=0, width=3)
+draw.text(((SCREEN_WIDTH - title_w) // 2, (TOPBAR_HEIGHT - 85) // 2), title_text, fill=COLOR_BLACK, font=font_title)
+
+# 右上角更新時間
+gen_time_str = f"Generated: {datetime.now(LOCAL_TZ).strftime('%Y-%m-%d %H:%M')}"
+info_w = draw.textlength(gen_time_str, font=font_info)
+draw.text((SCREEN_WIDTH - info_w - 30, (TOPBAR_HEIGHT - 24) // 2), gen_time_str, fill=COLOR_GRAY, font=font_info)
+
+draw.line([(0, TOPBAR_HEIGHT), (SCREEN_WIDTH, TOPBAR_HEIGHT)], fill=COLOR_BLACK, width=3)
 
 # 2. 星期列 (Sun - Sat)
 weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
@@ -120,11 +121,11 @@ for i, day_name in enumerate(weekdays):
     w = draw.textlength(day_name, font=font_week)
     x = i * CELL_WIDTH + (CELL_WIDTH - w) // 2
     y = TOPBAR_HEIGHT + (DOW_HEIGHT - 56) // 2
-    draw.text((x, y), day_name, fill=0, font=font_week)
+    draw.text((x, y), day_name, fill=COLOR_BLACK, font=font_week)
     if i < 6:
-        draw.line([((i + 1) * CELL_WIDTH, TOPBAR_HEIGHT), ((i + 1) * CELL_WIDTH, TOPBAR_HEIGHT + DOW_HEIGHT)], fill=0, width=2)
+        draw.line([((i + 1) * CELL_WIDTH, TOPBAR_HEIGHT), ((i + 1) * CELL_WIDTH, TOPBAR_HEIGHT + DOW_HEIGHT)], fill=COLOR_LINE, width=2)
 
-draw.line([(0, TOPBAR_HEIGHT + DOW_HEIGHT), (SCREEN_WIDTH, TOPBAR_HEIGHT + DOW_HEIGHT)], fill=0, width=3)
+draw.line([(0, TOPBAR_HEIGHT + DOW_HEIGHT), (SCREEN_WIDTH, TOPBAR_HEIGHT + DOW_HEIGHT)], fill=COLOR_BLACK, width=3)
 
 # 3. 日曆格子群
 current_year, current_month = 2026, 7
@@ -133,6 +134,22 @@ start_col = (first_weekday + 1) % 7
 start_of_calendar = datetime(current_year, current_month, 1) - timedelta(days=start_col)
 
 REAL_TOP = TOPBAR_HEIGHT + DOW_HEIGHT
+
+def split_text_to_two_lines(text, font, max_width):
+    if draw.textlength(text, font=font) <= max_width:
+        return [text]
+    line1 = ""
+    for char in text:
+        if draw.textlength(line1 + char, font=font) <= max_width:
+            line1 += char
+        else:
+            break
+    line2 = text[len(line1):]
+    if draw.textlength(line2, font=font) > max_width:
+        while draw.textlength(line2 + "..", font=font) > max_width and len(line2) > 0:
+            line2 = line2[:-1]
+        line2 += ".."
+    return [line1, line2]
 
 for row in range(GRID_ROWS):
     for col in range(GRID_COLS):
@@ -145,36 +162,38 @@ for row in range(GRID_ROWS):
         x2 = x1 + CELL_WIDTH
         y2 = y1 + CELL_HEIGHT
         
-        # 繪製邊框
-        if col < 6: draw.line([(x2, y1), (x2, y2)], fill=0, width=2)
-        draw.line([(x1, y2), (x2, y2)], fill=0, width=2)
+        # 繪製淡灰色網格線，視覺更輕盈
+        if col < 6: draw.line([(x2, y1), (x2, y2)], fill=COLOR_LINE, width=2)
+        draw.line([(x1, y2), (x2, y2)], fill=COLOR_LINE, width=2)
         
-        # 🌟 修正：日期數字不再死板置中，改成挪到左上角 (留白20px)，挪出空間給活動文字
+        # 🌟 判斷是否為本月，決定字體顏色 (本月=黑，非本月=淺灰)
+        is_current_month = (cell_date.month == current_month)
+        text_color = COLOR_BLACK if is_current_month else COLOR_GRAY
+        
+        # 日期數字
         date_text = str(cell_date.day)
-        draw.text((x1 + 20, y1 + 15), date_text, fill=0, font=font_date)
+        draw.text((x1 + 20, y1 + 15), date_text, fill=text_color, font=font_date)
             
-        # 繪製純文字行程列表（大字體、靠左對齊、無外框）
+        # 繪製行程列表
         if cell_date_str in calendar_events:
-            y_offset = y1 + 80  # 從日期下方開始排
-            line_height = 50    # 每行高度
+            y_offset = y1 + 75   
+            line_height = 34     
             
             for time_prefix, event_title in calendar_events[cell_date_str]:
-                if y_offset + line_height > y2 - 10:
-                    break
+                full_text = f"{time_prefix}{event_title}"
+                max_w = CELL_WIDTH - 35
                 
-                display_text = f"{time_prefix}{event_title}"
-                max_text_width = CELL_WIDTH - 30
+                lines = split_text_to_two_lines(full_text, font_event, max_w)
                 
-                # 自動截斷過長文字
-                if draw.textlength(display_text, font=font_event) > max_text_width:
-                    while draw.textlength(display_text + "..", font=font_event) > max_text_width and len(display_text) > 0:
-                        display_text = display_text[:-1]
-                    display_text += ".."
-                
-                # 寫入行程
-                draw.text((x1 + 20, y_offset), display_text, fill=0, font=font_event)
-                y_offset += line_height
+                for line in lines:
+                    if y_offset + line_height > y2 - 10:
+                        break
+                    # 🌟 這裡行程的文字也會跟著日子的屬性一起變淡或變黑，非常漂亮！
+                    draw.text((x1 + 20, y_offset), line, fill=text_color, font=font_event)
+                    y_offset += line_height
+                    
+                y_offset += 5
 
 # 儲存
 image.save("calendar.png")
-print("🎉 Calendar Updated!")
+print("🎉 Premium Grayscale Multi-line Calendar Generated!")
