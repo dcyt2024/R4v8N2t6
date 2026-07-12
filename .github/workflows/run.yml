@@ -30,6 +30,6 @@ jobs:
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        git add calendar.png
+        git add *.png
         git commit -m "Update calendar image" || exit 0
         git push
