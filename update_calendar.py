@@ -45,12 +45,12 @@ def get_scaled_font(font_size):
 font_title = get_scaled_font(85)   
 font_week = get_scaled_font(56)    
 font_date = get_scaled_font(52)    
-font_event = get_scaled_font(26)   
-font_info = get_scaled_font(24)    
+font_event = get_scaled_font(26)   # 細緻的活動字體
+font_info = get_scaled_font(24)    # 右上角時間字體
 
 # ==================== 3. Google API 資料讀取 ====================
 CALENDAR_ID = 'dcyt122024@gmail.com'
-API_KEY = 'AKfycbyiMdCmH_4MoCpOGkt4flb0luLreIjWh8NA3g7pEmbFaRbuG9P18kNF1Fqmy0L8sbjR'
+API_KEY = 'AIzaSyAYBpOB6UoMYeAAmwTM_1KdYEzwtv6zXiE'
 
 calendar_events = {}
 try:
@@ -85,7 +85,7 @@ try:
             if 'dateTime' in ev.get('start', {}):
                 t1 = start[11:16]
                 t2 = end[11:16] if end else ""
-                time_str = f"{t1}-{t2} " if t2 else f"{t1} "
+                time_str = f"{t1}-{t2}" if t2 else f"{t1}"
                 
             if day_key not in calendar_events:
                 calendar_events[day_key] = []
@@ -93,12 +93,11 @@ try:
 except Exception as e:
     print(f"API Error: {e}")
 
-# ==================== 4. 繪製與排版 (切換為灰階模式) ====================
-# 🌟 將模式從 "1" 改為 "L"，允許使用 0 (黑) ~ 255 (白) 之間的灰色
-image = Image.new("L", (SCREEN_WIDTH, SCREEN_HEIGHT), 255) # 255 是純白背景
+# ==================== 4. 繪製與排版 (真正灰階模式) ====================
+image = Image.new("L", (SCREEN_WIDTH, SCREEN_HEIGHT), 255) 
 draw = ImageDraw.Draw(image)
 
-# 顏色定義 (0為純黑，160為優雅淺灰，210為格線淡灰)
+# 顏色定義 (0為純黑，160為非本月日子淺灰，210為淡灰格線)
 COLOR_BLACK = 0
 COLOR_GRAY = 160
 COLOR_LINE = 210
@@ -108,14 +107,14 @@ title_text = "July 2026"
 title_w = draw.textlength(title_text, font=font_title)
 draw.text(((SCREEN_WIDTH - title_w) // 2, (TOPBAR_HEIGHT - 85) // 2), title_text, fill=COLOR_BLACK, font=font_title)
 
-# 右上角更新時間
+# 右上角加上擷圖更新時間
 gen_time_str = f"Generated: {datetime.now(LOCAL_TZ).strftime('%Y-%m-%d %H:%M')}"
 info_w = draw.textlength(gen_time_str, font=font_info)
 draw.text((SCREEN_WIDTH - info_w - 30, (TOPBAR_HEIGHT - 24) // 2), gen_time_str, fill=COLOR_GRAY, font=font_info)
 
 draw.line([(0, TOPBAR_HEIGHT), (SCREEN_WIDTH, TOPBAR_HEIGHT)], fill=COLOR_BLACK, width=3)
 
-# 2. 星期列 (Sun - Sat)
+# 2. 星期列
 weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 for i, day_name in enumerate(weekdays):
     w = draw.textlength(day_name, font=font_week)
@@ -135,7 +134,8 @@ start_of_calendar = datetime(current_year, current_month, 1) - timedelta(days=st
 
 REAL_TOP = TOPBAR_HEIGHT + DOW_HEIGHT
 
-def split_text_to_two_lines(text, font, max_width):
+# 自動換行演算法 (專門處理標題)
+def split_title_to_lines(text, font, max_width):
     if draw.textlength(text, font=font) <= max_width:
         return [text]
     line1 = ""
@@ -162,11 +162,11 @@ for row in range(GRID_ROWS):
         x2 = x1 + CELL_WIDTH
         y2 = y1 + CELL_HEIGHT
         
-        # 繪製淡灰色網格線，視覺更輕盈
+        # 畫輕盈的淡灰網格線
         if col < 6: draw.line([(x2, y1), (x2, y2)], fill=COLOR_LINE, width=2)
         draw.line([(x1, y2), (x2, y2)], fill=COLOR_LINE, width=2)
         
-        # 🌟 判斷是否為本月，決定字體顏色 (本月=黑，非本月=淺灰)
+        # 🌟 判斷是否為本月 (本月=黑，非本月=淺灰)[cite: 2]
         is_current_month = (cell_date.month == current_month)
         text_color = COLOR_BLACK if is_current_month else COLOR_GRAY
         
@@ -177,23 +177,27 @@ for row in range(GRID_ROWS):
         # 繪製行程列表
         if cell_date_str in calendar_events:
             y_offset = y1 + 75   
-            line_height = 34     
+            line_height = 32     
             
             for time_prefix, event_title in calendar_events[cell_date_str]:
-                full_text = f"{time_prefix}{event_title}"
                 max_w = CELL_WIDTH - 35
                 
-                lines = split_text_to_two_lines(full_text, font_event, max_w)
+                # 🌟 改進排版：如果有時間，時間自己單獨放一行
+                if time_prefix.strip():
+                    if y_offset + line_height > y2 - 10: break
+                    draw.text((x1 + 20, y_offset), time_prefix.strip(), fill=text_color, font=font_event)
+                    y_offset += line_height
                 
-                for line in lines:
-                    if y_offset + line_height > y2 - 10:
-                        break
-                    # 🌟 這裡行程的文字也會跟著日子的屬性一起變淡或變黑，非常漂亮！
+                # 標題從下一行開始，且支援最多折成兩行
+                title_lines = split_title_to_lines(event_title, font_event, max_w)
+                for line in title_lines:
+                    if y_offset + line_height > y2 - 10: break
                     draw.text((x1 + 20, y_offset), line, fill=text_color, font=font_event)
                     y_offset += line_height
                     
-                y_offset += 5
+                # 活動之間加點小間距
+                y_offset += 6
 
 # 儲存
 image.save("calendar.png")
-print("🎉 Premium Grayscale Multi-line Calendar Generated!")
+print("🎉 Premium Grayscale Calendar with Independent Time Lines Saved!")
