@@ -7,7 +7,7 @@ import os
 
 # ==================== 1. 1872*1404 排版設定 ====================
 # ⚠️ 請替換成你 Google 日曆的「不公開 iCal 網址」
-ICAL_URL = "https://calendar.google.com/calendar/ical/your_email%40gmail.com/private-xxxxxx/basic.ics"
+ICAL_URL = "https://calendar.google.com/calendar/ical/dcyt122024%40gmail.com/public/basic.ics"
 
 SCREEN_WIDTH = 1872
 SCREEN_HEIGHT = 1404
