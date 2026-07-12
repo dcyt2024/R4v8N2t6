@@ -8,7 +8,6 @@ from PIL import Image, ImageDraw, ImageFont
 import os
 
 # ==================== 1. 1872*1404 排版設定 ====================
-# ⚠️ 請確保這是你 Google 日曆的「不公開網址 (iCal 格式)」
 ICAL_URL = "https://calendar.google.com/calendar/u/4/r/settings/calendar/ZGN5dDEyMjAyNEBnbWFpbC5jb20"
 
 SCREEN_WIDTH = 1872
@@ -16,8 +15,8 @@ SCREEN_HEIGHT = 1404
 GRID_ROWS = 5
 GRID_COLS = 7
 
-# 🌟 頂部高度維持緊湊，釋放 1284 像素的高度給 5 排格子（每排格子高達 256 像素！）
-TOP_MARGIN = 120   
+# 參考 HTML 的 Topbar 與格子比例等比放大
+TOP_MARGIN = 140   
 CELL_WIDTH = SCREEN_WIDTH // GRID_COLS
 CELL_HEIGHT = (SCREEN_HEIGHT - TOP_MARGIN) // GRID_ROWS
 
@@ -31,7 +30,7 @@ try:
     with urllib.request.urlopen(req) as response:
         gcal = Calendar.from_ical(response.read())
 except Exception as e:
-    print(f"⚠️【網址錯誤警告】無法取得日曆資料: {e}")
+    print(f"⚠️無法取得日曆資料: {e}")
     gcal = None
 
 calendar_events = {}
@@ -71,7 +70,7 @@ if gcal is not None:
                     calendar_events[date_str] = []
                 calendar_events[date_str].append((time_str, summary))
 
-# ==================== 3. 初始化畫布與下載字型 ====================
+# ==================== 3. 初始化畫布與字型 ====================
 image = Image.new("1", (SCREEN_WIDTH, SCREEN_HEIGHT), 1)
 draw = ImageDraw.Draw(image)
 
@@ -85,39 +84,41 @@ if not os.path.exists(font_path):
     except:
         font_path = None
 
-# 🌟 終極放大版字體設定
-font_title = ImageFont.truetype(font_path, 130) if font_path else ImageFont.load_default() # 64 -> 130 (巨字)
-font_week = ImageFont.truetype(font_path, 50) if font_path else ImageFont.load_default()   # 32 -> 50
-font_date = ImageFont.truetype(font_path, 70) if font_path else ImageFont.load_default()   # 54 -> 70 (清晰大數字)
-font_event = ImageFont.truetype(font_path, 55) if font_path else ImageFont.load_default()  # 46 -> 55 (行程超清晰)
+# 🌟 對照 HTML 比例做 1872 解析度下的最完美縮放：
+font_title = ImageFont.truetype(font_path, 80) if font_path else ImageFont.load_default() # 放大版 .title (32px)
+font_week = ImageFont.truetype(font_path, 48) if font_path else ImageFont.load_default()  # 放大版 .dow (20px)
+font_date = ImageFont.truetype(font_path, 52) if font_path else ImageFont.load_default()  # 放大版 .date (22px)
+font_event = ImageFont.truetype(font_path, 42) if font_path else ImageFont.load_default() # 放大版 .event (18px)
 
-# ==================== 4. 繪製頂部介面（滿版排版） ====================
+# ==================== 4. 繪製頂部介面 ====================
 now = datetime.now(LOCAL_TZ)
 current_year = now.year
 current_month = now.month
 
-# 將月份與年份分開排版，或者直接並排，我們這裡稍微往左與往右微調讓空間最有效利用
 month_name = calendar.month_name[current_month].upper()
 title_text = f"{month_name} {current_year}"
 title_w = draw.textlength(title_text, font=font_title)
 title_x = (SCREEN_WIDTH - title_w) // 2
-# 稍微重疊上一點點沒關係，把 y 設在 -25 讓超大字能塞進 120 像素內
-draw.text((title_x, -25), title_text, fill=0, font=font_title) 
+draw.text((title_x, 25), title_text, fill=0, font=font_title) 
 
-weekdays = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"]
-for i, day_name in enumerate(weekdays):
-    w = draw.textlength(day_name, font=font_week)
-    x = i * CELL_WIDTH + (CELL_WIDTH - w) // 2
-    draw.text((x, 70), day_name, fill=0, font=font_week) 
-
-draw.line([(0, TOP_MARGIN), (SCREEN_WIDTH, TOP_MARGIN)], fill=0, width=5)
+# 頂部橫線
+draw.line([(0, TOP_MARGIN), (SCREEN_WIDTH, TOP_MARGIN)], fill=0, width=4)
 
 # ==================== 5. 繪製日曆格子與行程 ====================
 first_weekday, num_days = calendar.monthrange(current_year, current_month)
 start_col = (first_weekday + 1) % 7 
 start_of_calendar = datetime(current_year, current_month, 1, tzinfo=LOCAL_TZ) - timedelta(days=start_col)
 
-MAX_TEXT_WIDTH = CELL_WIDTH - 30
+# 星期欄位高度（56px 等比放大）
+DOW_HEIGHT = 60
+for i, day_name in enumerate(["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]):
+    w = draw.textlength(day_name, font=font_week)
+    x = i * CELL_WIDTH + (CELL_WIDTH - w) // 2
+    draw.text((x, TOP_MARGIN + (DOW_HEIGHT - 48) // 2), day_name, fill=0, font=font_week)
+
+# 真正的格子起點要扣掉星期欄位
+REAL_TOP = TOP_MARGIN + DOW_HEIGHT
+REAL_CELL_HEIGHT = (SCREEN_HEIGHT - REAL_TOP) // GRID_ROWS
 
 for row in range(GRID_ROWS):
     for col in range(GRID_COLS):
@@ -126,47 +127,58 @@ for row in range(GRID_ROWS):
         cell_date_str = cell_date.strftime("%Y-%m-%d")
         
         x1 = col * CELL_WIDTH
-        y1 = TOP_MARGIN + (row * CELL_HEIGHT)
+        y1 = REAL_TOP + (row * REAL_CELL_HEIGHT)
         x2 = x1 + CELL_WIDTH
-        y2 = y1 + CELL_HEIGHT
+        y2 = y1 + REAL_CELL_HEIGHT
         
-        draw.rectangle([(x1, y1), (x2, y2)], outline=0, width=1)
+        # 畫日曆外框
+        draw.rectangle([(x1, y1), (x2, y2)], outline=0, width=2)
         
         if cell_date.month != current_month:
             continue
             
-        # 繪製日期大數字
+        # 繪製置中日期數字 (.date)
         date_text = str(cell_date.day)
         text_w = draw.textlength(date_text, font=font_date)
-        draw.text((x2 - text_w - 20, y1 + 10), date_text, fill=0, font=font_date)
+        date_x = x1 + (CELL_WIDTH - text_w) // 2
+        draw.text((date_x, y1 + 15), date_text, fill=0, font=font_date)
         
+        # 當天加一個小底圈 (等同於今天的 .date-badge)
+        if cell_date == today:
+            draw.arc([date_x - 10, y1 + 10, date_x + text_w + 10, y1 + 65], 0, 360, fill=0, width=3)
+        
+        # 繪製行程 (.events)
         if cell_date_str in calendar_events:
             sorted_events = sorted(calendar_events[cell_date_str], key=lambda x: x[0] if x[0] else "24:00")
             
-            # 配合大字體，下移初始行程位置與加大行高
-            y_offset = y1 + 90  
-            line_height = 65    # 大字體需要 65 像素行高才不會重疊
+            y_offset = y1 + 80   # 保留上方給日期數字
+            box_height = 56     # 行程外框盒子的高度
+            gap = 10            # 盒子之間的間距
             
             for index, (time_prefix, event_title) in enumerate(sorted_events):
-                if index >= 2 or (y_offset + line_height > y2): # 超大字體下一格最多顯示 2~3 條
+                # 確保格子裝得下，裝不下才不顯示
+                if y_offset + box_height > y2 - 10:
                     break
                 
-                display_text = f"{time_prefix}{event_title}"
-                current_max_width = MAX_TEXT_WIDTH
-                if (index == 1 or y_offset + (line_height * 2) > y2) and len(sorted_events) > (index + 1):
-                    current_max_width = MAX_TEXT_WIDTH - 60
+                # 🌟 模擬 HTML 的 .event 邊框盒
+                # 畫出行程背景的小邊框
+                draw.rectangle([(x1 + 12, y_offset), (x2 - 12, y_offset + box_height)], outline=0, width=1)
                 
-                if draw.textlength(display_text, font=font_event) > current_max_width:
-                    while draw.textlength(display_text + "..", font=font_event) > current_max_width and len(display_text) > 0:
+                # 準備文字
+                display_text = f"{time_prefix}{event_title}"
+                max_text_width = CELL_WIDTH - 48 # 扣掉左右邊距
+                
+                # 自動截斷超長文字
+                if draw.textlength(display_text, font=font_event) > max_text_width:
+                    while draw.textlength(display_text + "..", font=font_event) > max_text_width and len(display_text) > 0:
                         display_text = display_text[:-1]
                     display_text += ".."
                 
-                if (index == 1 or y_offset + (line_height * 2) > y2) and len(sorted_events) > (index + 1):
-                    display_text += "..."
+                # 填入文字到盒子內 (靠左微調垂直置中)
+                draw.text((x1 + 24, y_offset + (box_height - 42) // 2), display_text, fill=0, font=font_event)
                 
-                draw.text((x1 + 20, y_offset), display_text, fill=0, font=font_event)
-                y_offset += line_height
+                y_offset += box_height + gap
 
-# 儲存本地圖片
+# 儲存
 image.save("calendar.png")
-print("🎉 GIANT Font & Compact Top Bar Calendar Generated!")
+print("🎉 HTML-Balanced Calendar Generated!")
