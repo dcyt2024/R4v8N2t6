@@ -7,14 +7,14 @@ import os
 
 # ==================== 1. 1872*1404 排版設定 ====================
 # ⚠️ 請替換成你 Google 日曆的「不公開 iCal 網址」
-ICAL_URL = "https://calendar.google.com/calendar/ical/dcyt122024%40gmail.com/public/basic.ics"
+ICAL_URL = "https://calendar.google.com/calendar/ical/your_email%40gmail.com/private-xxxxxx/basic.ics"
 
 SCREEN_WIDTH = 1872
 SCREEN_HEIGHT = 1404
 GRID_ROWS = 5
 GRID_COLS = 7
 
-TOP_MARGIN = 180   # 稍微加高頂部，留給更大的標題
+TOP_MARGIN = 240   # 🌟 大幅加高頂部留白，給予置中超級大標題足夠的空間
 CELL_WIDTH = SCREEN_WIDTH // GRID_COLS
 CELL_HEIGHT = (SCREEN_HEIGHT - TOP_MARGIN) // GRID_ROWS
 
@@ -32,23 +32,35 @@ except Exception as e:
     gcal = []
 
 calendar_events = {}
+# 為了安全抓取當月完整行程
 today = datetime.now(LOCAL_TZ).date()
-end_date = today + timedelta(days=35)
+start_of_month = datetime(today.year, today.month, 1).date()
+end_of_month = datetime(today.year, today.month, calendar.monthrange(today.year, today.month)[1]).date()
 
 for component in gcal.walk():
     if component.name == "VEVENT":
         summary = str(component.get('summary', 'No Title'))
         dtstart = component.get('dtstart').dt
+        dtend = component.get('dtend').dt
         
         time_str = "" 
         if isinstance(dtstart, datetime):
-            local_dt = dtstart.astimezone(LOCAL_TZ)
-            event_date = local_dt.date()
-            time_str = local_dt.strftime("%H:%M ")
+            local_start = dtstart.astimezone(LOCAL_TZ)
+            event_date = local_start.date()
+            
+            # 🌟 核心修正：同時抓取並格式化開始與結束時間 (例如 10:00-11:30)
+            start_time = local_start.strftime("%H:%M")
+            if isinstance(dtend, datetime):
+                local_end = dtend.astimezone(LOCAL_TZ)
+                end_time = local_end.strftime("%H:%M")
+                time_str = f"{start_time}-{end_time} "
+            else:
+                time_str = f"{start_time} "
         else:
             event_date = dtstart
             
-        if today <= event_date <= end_date:
+        # 只記錄本月範圍內的活動
+        if start_of_month <= event_date <= end_of_month:
             date_str = event_date.strftime("%Y-%m-%d")
             if date_str not in calendar_events:
                 calendar_events[date_str] = []
@@ -58,7 +70,6 @@ for component in gcal.walk():
 image = Image.new("1", (SCREEN_WIDTH, SCREEN_HEIGHT), 1)
 draw = ImageDraw.Draw(image)
 
-# 強制下載支援繁中與英文的高畫質字型（微軟正黑體相容版）
 font_url = "https://github.com/hanyuan-font/msjh/raw/master/msjh.ttf"
 font_path = "msjh.ttf"
 
@@ -69,38 +80,40 @@ if not os.path.exists(font_path):
     except:
         font_path = None
 
-# 🌟 核心修正：全面大幅度放大字體大小
-font_title = ImageFont.truetype(font_path, 72) if font_path else ImageFont.load_default() # 原 54 -> 72
-font_week = ImageFont.truetype(font_path, 32) if font_path else ImageFont.load_default()  # 原 24 -> 32
-font_date = ImageFont.truetype(font_path, 40) if font_path else ImageFont.load_default()  # 原 28 -> 40
-font_event = ImageFont.truetype(font_path, 34) if font_path else ImageFont.load_default() # 原 22 -> 34 (超清晰大字)
+# 🌟 核心修正：字體全面終極放大，活動字體放大到 42 級！
+font_title = ImageFont.truetype(font_path, 96) if font_path else ImageFont.load_default() # 54 -> 72 -> 96 (超級巨無霸標題)
+font_week = ImageFont.truetype(font_path, 36) if font_path else ImageFont.load_default()  # 24 -> 32 -> 36
+font_date = ImageFont.truetype(font_path, 42) if font_path else ImageFont.load_default()  # 28 -> 40 -> 42
+font_event = ImageFont.truetype(font_path, 42) if font_path else ImageFont.load_default() # 22 -> 34 -> 42 (終極清晰大字)
 
-# ==================== 4. 繪製頂部介面 ====================
+# ==================== 4. 繪製頂部介面（置中超大標題） ====================
 now = datetime.now(LOCAL_TZ)
 current_year = now.year
 current_month = now.month
 
-# 標題 (例如 "JULY 2026")
+# 🌟 核心修正：將月份標題（例如 "JULY 2026"）進行精確的水平中央置中
 month_name = calendar.month_name[current_month].upper()
-draw.text((50, 35), f"{month_name} {current_year}", fill=0, font=font_title)
+title_text = f"{month_name} {current_year}"
+title_w = draw.textlength(title_text, font=font_title)
+title_x = (SCREEN_WIDTH - title_w) // 2
+draw.text((title_x, 40), title_text, fill=0, font=font_title)
 
 # 星期標題
 weekdays = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"]
 for i, day_name in enumerate(weekdays):
     w = draw.textlength(day_name, font=font_week)
     x = i * CELL_WIDTH + (CELL_WIDTH - w) // 2
-    draw.text((x, 125), day_name, fill=0, font=font_week)
+    draw.text((x, 185), day_name, fill=0, font=font_week)
 
-# 頂部裝飾線
-draw.line([(0, TOP_MARGIN), (SCREEN_WIDTH, TOP_MARGIN)], fill=0, width=5)
+# 頂部裝飾粗線
+draw.line([(0, TOP_MARGIN), (SCREEN_WIDTH, TOP_MARGIN)], fill=0, width=6)
 
 # ==================== 5. 繪製日曆格子與行程 ====================
 first_weekday, num_days = calendar.monthrange(current_year, current_month)
 start_col = (first_weekday + 1) % 7 
 start_of_calendar = datetime(current_year, current_month, 1, tzinfo=LOCAL_TZ) - timedelta(days=start_col)
 
-# 左右留白保護區
-MAX_TEXT_WIDTH = CELL_WIDTH - 30
+MAX_TEXT_WIDTH = CELL_WIDTH - 24
 
 for row in range(GRID_ROWS):
     for col in range(GRID_COLS):
@@ -113,45 +126,47 @@ for row in range(GRID_ROWS):
         x2 = x1 + CELL_WIDTH
         y2 = y1 + CELL_HEIGHT
         
-        # 畫格子邊框
+        # 畫日曆格子邊框
         draw.rectangle([(x1, y1), (x2, y2)], outline=0, width=1)
         
-        # 日期文字 (右上角)
-        date_text = str(cell_date.day)
+        # 🌟 核心修正：如果不是本月的日子（6月或8月），直接跳過不繪製任何數字和行程（格子留空）
         if cell_date.month != current_month:
-            date_text = f"[{date_text}]"
+            continue
             
+        # 右上角繪製本月日期數字
+        date_text = str(cell_date.day)
         text_w = draw.textlength(date_text, font=font_date)
-        draw.text((x2 - text_w - 15, y1 + 15), date_text, fill=0, font=font_date)
+        draw.text((x2 - text_w - 15, y1 + 12), date_text, fill=0, font=font_date)
         
-        # 填入行程 (最多 3 個)
+        # 填入行程 (因字體極大，最多容納 2-3 個)
         if cell_date_str in calendar_events:
+            # 排序：有時間的行程排前面
             sorted_events = sorted(calendar_events[cell_date_str], key=lambda x: x[0] if x[0] else "24:00")
             
-            # 🌟 核心修正：行高與起點重新計算，以適應 34 級大字
-            y_offset = y1 + 65  # 日期下方的起點
-            line_height = 46    # 大字體的舒適舒適行距
+            y_offset = y1 + 65  # 大字體起始高度
+            line_height = 54    # 42級字體所需要的舒適安全行高
             
             for index, (time_prefix, event_title) in enumerate(sorted_events):
-                # 🌟 如果已經到第 4 個活動，或是空間不夠了，就在前一行結尾加 "..." 並強行中斷
-                if index >= 3:
+                # 超過 3 行（或空間不夠）則停止繪製，避免溢出格子
+                if index >= 3 or (y_offset + line_height > y2):
                     break
                 
+                # 行程格式：例如 "10:00-11:30 Meeting"
                 display_text = f"{time_prefix}{event_title}"
                 
-                # 如果是第 3 個活動，且後面還有更多行程，預留長度給 "..."
+                # 如果是最後一行且後面還有活動，預留長度給 "..."
                 current_max_width = MAX_TEXT_WIDTH
-                if index == 2 and len(sorted_events) > 3:
-                    current_max_width = MAX_TEXT_WIDTH - 40
+                if (index == 2 or y_offset + (line_height * 2) > y2) and len(sorted_events) > (index + 1):
+                    current_max_width = MAX_TEXT_WIDTH - 50
                 
-                # 精確像素寬度截斷
+                # 精確像素截斷
                 if draw.textlength(display_text, font=font_event) > current_max_width:
                     while draw.textlength(display_text + "..", font=font_event) > current_max_width and len(display_text) > 0:
                         display_text = display_text[:-1]
                     display_text += ".."
                 
-                # 如果有第 4 個活動，我們在第 3 個活動後方加上 "..." 提示
-                if index == 2 and len(sorted_events) > 3:
+                # 加上多餘活動的 "..." 提示
+                if (index == 2 or y_offset + (line_height * 2) > y2) and len(sorted_events) > (index + 1):
                     display_text += "..."
                 
                 draw.text((x1 + 15, y_offset), display_text, fill=0, font=font_event)
@@ -159,4 +174,4 @@ for row in range(GRID_ROWS):
 
 # ==================== 6. 儲存圖片 ====================
 image.save("calendar.png")
-print("🎉 Large Font Calendar Image Generated!")
+print("🎉 Masterpiece Calendar Image with Start-End Time Generated!")
