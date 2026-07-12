@@ -10,9 +10,8 @@ import os
 SCREEN_WIDTH = 1872
 SCREEN_HEIGHT = 1404
 
-# 🌟 大幅壓縮頂部，把空間全部讓給格子（解鎖格子高度）
-TOPBAR_HEIGHT = 100   # 150 -> 100
-DOW_HEIGHT = 70       # 120 -> 70
+TOPBAR_HEIGHT = 100   
+DOW_HEIGHT = 70       
 
 GRID_ROWS = 5
 GRID_COLS = 7
@@ -43,10 +42,10 @@ def get_scaled_font(font_size):
                 continue
     return ImageFont.load_default(size=font_size)
 
-font_title = get_scaled_font(70)   # 稍微精簡
-font_week = get_scaled_font(44)    # 56 -> 44 縮小星期
-font_date = get_scaled_font(38)    # 52 -> 38 縮小日期數字，避免吃掉行程空間
-font_event = get_scaled_font(24)   # 行程字體保持適中好讀
+font_title = get_scaled_font(70)   
+font_week = get_scaled_font(44)    
+font_date = get_scaled_font(38)    
+font_event = get_scaled_font(24)   
 font_info = get_scaled_font(22)    
 
 # ==================== 3. Google API 資料讀取 ====================
@@ -102,24 +101,24 @@ COLOR_BLACK = 0
 COLOR_GRAY = 160
 COLOR_LINE = 210
 
-# 1. Topbar：July 2026 居中 (微調垂直位移，減少多餘空白)
+# 1. Topbar 主標題
 title_text = "July 2026"
 title_w = draw.textlength(title_text, font=font_title)
 draw.text(((SCREEN_WIDTH - title_w) // 2, (TOPBAR_HEIGHT - 70) // 2), title_text, fill=COLOR_BLACK, font=font_title)
 
-# 右上角更新時間
+# 🌟 修正：讓 Generated 時間行精準「貼緊」下方黑線 (TOPBAR_HEIGHT - 字高 - 留白)
 gen_time_str = f"Generated: {datetime.now(LOCAL_TZ).strftime('%Y-%m-%d %H:%M')}"
 info_w = draw.textlength(gen_time_str, font=font_info)
-draw.text((SCREEN_WIDTH - info_w - 30, (TOPBAR_HEIGHT - 22) // 2), gen_time_str, fill=COLOR_GRAY, font=font_info)
+draw.text((SCREEN_WIDTH - info_w - 30, TOPBAR_HEIGHT - 22 - 6), gen_time_str, fill=COLOR_GRAY, font=font_info)
 
 draw.line([(0, TOPBAR_HEIGHT), (SCREEN_WIDTH, TOPBAR_HEIGHT)], fill=COLOR_BLACK, width=3)
 
-# 2. 星期列 (縮小並緊湊排版)
+# 2. 星期列
 weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 for i, day_name in enumerate(weekdays):
     w = draw.textlength(day_name, font=font_week)
     x = i * CELL_WIDTH + (CELL_WIDTH - w) // 2
-    y = TOPBAR_HEIGHT + (DOW_HEIGHT - 44) // 2  # 精準居中
+    y = TOPBAR_HEIGHT + (DOW_HEIGHT - 44) // 2
     draw.text((x, y), day_name, fill=COLOR_BLACK, font=font_week)
     if i < 6:
         draw.line([((i + 1) * CELL_WIDTH, TOPBAR_HEIGHT), ((i + 1) * CELL_WIDTH, TOPBAR_HEIGHT + DOW_HEIGHT)], fill=COLOR_LINE, width=2)
@@ -168,44 +167,34 @@ for row in range(GRID_ROWS):
         is_current_month = (cell_date.month == current_month)
         text_color = COLOR_BLACK if is_current_month else COLOR_GRAY
         
-        # 🌟 繪製日期數字（縮小至 38px）
+        # 日期數字回到左上角
         date_text = str(cell_date.day)
         draw.text((x1 + 15, y1 + 12), date_text, fill=text_color, font=font_date)
             
-        # 繪製行程列表
+        # 繪製行程列表 (全面垂直對齊，解鎖錯位)
         if cell_date_str in calendar_events:
-            events_list = calendar_events[cell_date_str]
+            y_offset = y1 + 55   # 🌟 統一從日期下方 55px 開始一行行往下排
+            line_height = 28    
             
-            y_offset = y1 + 15  # 🌟 起始高度拉高，與日期平齊
-            line_height = 28    # 緊湊行高
-            
-            for idx, (time_prefix, event_title) in enumerate(events_list):
+            for time_prefix, event_title in calendar_events[cell_date_str]:
                 max_w = CELL_WIDTH - 30
                 
-                # 🌟 如果是第一個行程，且有時間，嘗試把時間直接排在日期的右邊！
-                if idx == 0 and time_prefix.strip():
-                    time_w = draw.textlength(time_prefix.strip(), font=font_event)
-                    # 畫在格子的右上角
-                    draw.text((x2 - time_w - 15, y1 + 16), time_prefix.strip(), fill=text_color, font=font_event)
-                    # 然後標題直接換行放
-                    y_offset = y1 + 55 
-                else:
-                    # 不是第一個，或者沒有時間，就正常走獨立時間行
-                    if time_prefix.strip():
-                        if y_offset + line_height > y2 - 8: break
-                        draw.text((x1 + 15, y_offset), time_prefix.strip(), fill=text_color, font=font_event)
-                        y_offset += line_height
+                # 1. 繪製時間行
+                if time_prefix.strip():
+                    if y_offset + line_height > y2 - 8: break
+                    draw.text((x1 + 15, y_offset), time_prefix.strip(), fill=text_color, font=font_event)
+                    y_offset += line_height
                 
-                # 繪製標題（最多兩行）
+                # 2. 繪製標題行（支援長標題折行）
                 title_lines = split_title_to_lines(event_title, font_event, max_w)
                 for line in title_lines:
                     if y_offset + line_height > y2 - 8: break
                     draw.text((x1 + 15, y_offset), line, fill=text_color, font=font_event)
                     y_offset += line_height
                     
-                # 縮減活動間的間距，壓榨出最大空間
+                # 行程之間的微小空隙
                 y_offset += 4
 
 # 儲存
 image.save("calendar.png")
-print("🎉 Layout optimized! Maximum event capacity unlocked.")
+print("🎉 Perfect alignment version generated!")
