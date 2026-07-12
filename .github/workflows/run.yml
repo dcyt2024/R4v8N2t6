@@ -2,7 +2,7 @@ name: Update Calendar Image
 
 on:
   schedule:
-    - cron: '20,50* * * *' # 🌟 這行改掉！意思是每隔 30 分鐘執行一次
+    - cron: '25,50 * * * *' # 🌟 這行改掉！意思是每隔 30 分鐘執行一次
   workflow_dispatch: # 允許手動點擊測試
 
 jobs:
