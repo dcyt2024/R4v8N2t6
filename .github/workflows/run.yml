@@ -1,0 +1,35 @@
+name: Update Calendar Image
+
+on:
+  schedule:
+    - cron: '*/30 * * * *' # 🌟 這行改掉！意思是每隔 30 分鐘執行一次
+  workflow_dispatch: # 允許手動點擊測試
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+
+    - name: Run script
+      run: python update_calendar.py
+
+    - name: Commit and Push
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add calendar.png
+        git commit -m "Update calendar image" || exit 0
+        git push
