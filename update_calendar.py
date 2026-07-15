@@ -16,7 +16,13 @@ TOPBAR_HEIGHT, DOW_HEIGHT = 187, 131
 GRID_ROWS, GRID_COLS = 5, 7
 CELL_WIDTH, CELL_HEIGHT = SCREEN_WIDTH // GRID_COLS, (SCREEN_HEIGHT - TOPBAR_HEIGHT - DOW_HEIGHT) // GRID_ROWS
 LOCAL_TZ = timezone(timedelta(hours=8))
-COLOR_BLACK, COLOR_GRAY, COLOR_LINE = 0, 160, 210
+
+# 改為 RGB 色彩設定以支援橙色
+COLOR_BLACK = (0, 0, 0)
+COLOR_GRAY = (160, 160, 160)
+COLOR_LINE = (0, 160, 210)     # 原本的藍色格線
+COLOR_ORANGE = (242, 133, 0)   # 橙色 (用於標題有 [SH] 的 Event)
+COLOR_WHITE = (255, 255, 255)
 
 def get_scaled_font(font_size):
     font_sources = ["msjh.ttf", "C:/Windows/Fonts/msjh.ttc", "/System/Library/Fonts/STHeiti Light.ttc", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"]
@@ -29,16 +35,17 @@ def get_scaled_font(font_size):
             except: continue
     return ImageFont.load_default(size=font_size)
 
-# 【字型大小保持不變】
+# 字型大小設定
 font_title = get_scaled_font(70)
 font_week = get_scaled_font(44)
 font_date = get_scaled_font(38)
-font_event = get_scaled_font(24)
+font_event = get_scaled_font(36) # 【Event 字體加大一半 24 -> 36】
 font_info = get_scaled_font(22)
 
 # ==================== 2. 完美繪圖邏輯 (封裝) ====================
 def generate_perfect_calendar(year, month, events, filename):
-    image = Image.new("L", (SCREEN_WIDTH, SCREEN_HEIGHT), 255)
+    # 改用 "RGB" 模式以支援彩色（橙色）
+    image = Image.new("RGB", (SCREEN_WIDTH, SCREEN_HEIGHT), COLOR_WHITE)
     draw = ImageDraw.Draw(image)
 
     # 標題 (微調 Y 軸置中偏移)
@@ -93,17 +100,29 @@ def generate_perfect_calendar(year, month, events, filename):
             if col < 6: draw.line([(x2, y1), (x2, y2)], fill=COLOR_LINE, width=4)
             draw.line([(x1, y2), (x2, y2)], fill=COLOR_LINE, width=4)
             
-            text_color = COLOR_BLACK if cell_date.month == month else COLOR_GRAY
-            draw.text((x1 + 15, y1 + 12), str(cell_date.day), fill=text_color, font=font_date)
+            # 日期顏色
+            date_color = COLOR_BLACK if cell_date.month == month else COLOR_GRAY
+            draw.text((x1 + 15, y1 + 12), str(cell_date.day), fill=date_color, font=font_date)
             
             if cell_date.strftime("%Y-%m-%d") in events:
-                y_offset = y1 + 55
+                # 配合加大後的日曆字體，將事件起始 Y 軸偏移量稍微下移
+                y_offset = y1 + 65 
                 for time_prefix, event_title in events[cell_date.strftime("%Y-%m-%d")]:
-                    for line in split_event_to_lines(f"{time_prefix}{event_title}".strip(), font_event, CELL_WIDTH - 30):
-                        if y_offset + 28 > y2 - 8: break
-                        draw.text((x1 + 15, y_offset), line, fill=text_color, font=font_event)
-                        y_offset += 28
-                    y_offset += 4
+                    full_event_text = f"{time_prefix}{event_title}".strip()
+                    
+                    # 判斷標題是否含有 "[SH]"
+                    if "[SH]" in event_title:
+                        event_color = COLOR_ORANGE
+                    else:
+                        event_color = COLOR_BLACK if cell_date.month == month else COLOR_GRAY
+                    
+                    # 依據放大後的 font_event (36pt) 進行折行
+                    for line in split_event_to_lines(full_event_text, font_event, CELL_WIDTH - 30):
+                        # 36pt 字體高約 42 像素，預留安全間距
+                        if y_offset + 42 > y2 - 8: break
+                        draw.text((x1 + 15, y_offset), line, fill=event_color, font=font_event)
+                        y_offset += 42
+                    y_offset += 6
     image.save(filename)
 
 # ==================== 3. 主循環：產生 6 個月 ====================
