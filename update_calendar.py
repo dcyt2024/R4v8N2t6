@@ -6,9 +6,13 @@ import calendar
 from PIL import Image, ImageDraw, ImageFont
 import os
 
-# ==================== 1. 設定與工具函式 ====================
-SCREEN_WIDTH, SCREEN_HEIGHT = 1872, 1404
-TOPBAR_HEIGHT, DOW_HEIGHT = 100, 70
+# ==================== 1. 設定與工具函式 (已修改為 A4 橫式與等比例格線) ====================
+# A4 橫式 300 DPI 尺寸 (3508 x 2480)
+SCREEN_WIDTH, SCREEN_HEIGHT = 3508, 2480
+
+# 頂部欄與星期欄高度按比例放大 (原本為 100 和 70，放大約 1.87 倍)
+TOPBAR_HEIGHT, DOW_HEIGHT = 187, 131
+
 GRID_ROWS, GRID_COLS = 5, 7
 CELL_WIDTH, CELL_HEIGHT = SCREEN_WIDTH // GRID_COLS, (SCREEN_HEIGHT - TOPBAR_HEIGHT - DOW_HEIGHT) // GRID_ROWS
 LOCAL_TZ = timezone(timedelta(hours=8))
@@ -25,6 +29,7 @@ def get_scaled_font(font_size):
             except: continue
     return ImageFont.load_default(size=font_size)
 
+# 【字型大小保持不變】
 font_title = get_scaled_font(70)
 font_week = get_scaled_font(44)
 font_date = get_scaled_font(38)
@@ -36,25 +41,30 @@ def generate_perfect_calendar(year, month, events, filename):
     image = Image.new("L", (SCREEN_WIDTH, SCREEN_HEIGHT), 255)
     draw = ImageDraw.Draw(image)
 
-    # 標題
+    # 標題 (微調 Y 軸置中偏移)
     title_text = f"{calendar.month_name[month]} {year}"
     title_w = draw.textlength(title_text, font=font_title)
     draw.text(((SCREEN_WIDTH - title_w) // 2, (TOPBAR_HEIGHT - 70) // 2), title_text, fill=COLOR_BLACK, font=font_title)
 
-    # 更新時間
+    # 更新時間 (微調位置以適應放大後的頂部欄)
     gen_time_str = f"Generated: {datetime.now(LOCAL_TZ).strftime('%Y-%m-%d %H:%M')}"
     info_w = draw.textlength(gen_time_str, font=font_info)
-    draw.text((SCREEN_WIDTH - info_w - 30, TOPBAR_HEIGHT - 22 - 6), gen_time_str, fill=COLOR_GRAY, font=font_info)
+    draw.text((SCREEN_WIDTH - info_w - 30, TOPBAR_HEIGHT - 22 - 15), gen_time_str, fill=COLOR_GRAY, font=font_info)
 
-    draw.line([(0, TOPBAR_HEIGHT), (SCREEN_WIDTH, TOPBAR_HEIGHT)], fill=COLOR_BLACK, width=3)
+    # 頂部粗分割線按比例加粗 (width=3 -> width=6)
+    draw.line([(0, TOPBAR_HEIGHT), (SCREEN_WIDTH, TOPBAR_HEIGHT)], fill=COLOR_BLACK, width=6)
 
     # 星期列
     weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
     for i, day_name in enumerate(weekdays):
         w = draw.textlength(day_name, font=font_week)
+        # 垂直置中微調
         draw.text((i * CELL_WIDTH + (CELL_WIDTH - w) // 2, TOPBAR_HEIGHT + (DOW_HEIGHT - 44) // 2), day_name, fill=COLOR_BLACK, font=font_week)
-        if i < 6: draw.line([((i + 1) * CELL_WIDTH, TOPBAR_HEIGHT), ((i + 1) * CELL_WIDTH, TOPBAR_HEIGHT + DOW_HEIGHT)], fill=COLOR_LINE, width=2)
-    draw.line([(0, TOPBAR_HEIGHT + DOW_HEIGHT), (SCREEN_WIDTH, TOPBAR_HEIGHT + DOW_HEIGHT)], fill=COLOR_BLACK, width=3)
+        # 直線按比例加粗 (width=2 -> width=4)
+        if i < 6: draw.line([((i + 1) * CELL_WIDTH, TOPBAR_HEIGHT), ((i + 1) * CELL_WIDTH, TOPBAR_HEIGHT + DOW_HEIGHT)], fill=COLOR_LINE, width=4)
+    
+    # 星期列底部粗分割線按比例加粗 (width=3 -> width=6)
+    draw.line([(0, TOPBAR_HEIGHT + DOW_HEIGHT), (SCREEN_WIDTH, TOPBAR_HEIGHT + DOW_HEIGHT)], fill=COLOR_BLACK, width=6)
 
     # 格子與事件
     def split_event_to_lines(text, font, max_width):
@@ -79,8 +89,9 @@ def generate_perfect_calendar(year, month, events, filename):
             x1, y1 = col * CELL_WIDTH, TOPBAR_HEIGHT + DOW_HEIGHT + (row * CELL_HEIGHT)
             x2, y2 = x1 + CELL_WIDTH, y1 + CELL_HEIGHT
             
-            if col < 6: draw.line([(x2, y1), (x2, y2)], fill=COLOR_LINE, width=2)
-            draw.line([(x1, y2), (x2, y2)], fill=COLOR_LINE, width=2)
+            # 方格線按比例加粗 (width=2 -> width=4)
+            if col < 6: draw.line([(x2, y1), (x2, y2)], fill=COLOR_LINE, width=4)
+            draw.line([(x1, y2), (x2, y2)], fill=COLOR_LINE, width=4)
             
             text_color = COLOR_BLACK if cell_date.month == month else COLOR_GRAY
             draw.text((x1 + 15, y1 + 12), str(cell_date.day), fill=text_color, font=font_date)
