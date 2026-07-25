@@ -163,23 +163,26 @@ for i in range(6):
                 is_holiday_cal = 'holiday' in cal_id 
                 
                 for ev in data.get('items', []):
-                    start = ev.get('start', {}).get('dateTime') or ev.get('start', {}).get('date')
-                    day = start[:10]
+                    # --- 改進：加入 Start/End 時間判斷 ---
+                    start_dt = ev.get('start', {}).get('dateTime')
+                    end_dt = ev.get('end', {}).get('dateTime')
+                    
+                    day = (start_dt or ev.get('start', {}).get('date'))[:10]
                     if day not in events: events[day] = []
                     
                     if is_holiday_cal:
                         holiday_dates.add(day)
                         
+                    # 如果有開始和結束時間，顯示 Start-End，否則只顯示開始時間
                     time_str = ""
-                    if 'dateTime' in ev.get('start', {}):
-                        t1 = start[11:16]
-                        time_str = f"{t1} "
+                    if start_dt and end_dt:
+                        time_str = f"{start_dt[11:16]}-{end_dt[11:16]} "
+                    elif start_dt:
+                        time_str = f"{start_dt[11:16]} "
                     
                     events[day].append((time_str, ev.get('summary', '(No title)'), is_holiday_cal))
         except Exception as e: print(f"API Error: {e}")
     
-    # --- 新增的排序邏輯 ---
-    # 對每一天的事件進行排序，is_holiday_cal 為 True 的會排在前面
     for day in events:
         events[day].sort(key=lambda x: x[2], reverse=True)
     
