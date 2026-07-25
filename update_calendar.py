@@ -21,15 +21,18 @@ COLOR_ORANGE = (242, 133, 0)   # [SH] 橙色
 COLOR_WHITE = (255, 255, 255)
 
 def get_scaled_font(font_size):
-    font_sources = ["msjh.ttf", "C:/Windows/Fonts/msjh.ttc", "/System/Library/Fonts/STHeiti Light.ttc", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"]
-    if not os.path.exists("msjh.ttf"):
-        try: urllib.request.urlretrieve("https://github.com/hanyuan-font/msjh/raw/master/msjh.ttf", "msjh.ttf")
-        except: pass
+    # 優先嘗試 Linux 系統安裝好的中文字體路徑 (GitHub Actions 環境)
+    linux_font_path = "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc"
+    if os.path.exists(linux_font_path):
+        return ImageFont.truetype(linux_font_path, font_size)
+    
+    # 本地開發環境 (Windows) 的後備方案
+    font_sources = ["msjh.ttf", "C:/Windows/Fonts/msjh.ttc"]
     for path in font_sources:
-        if os.path.exists(path) or path == "msjh.ttf":
+        if os.path.exists(path):
             try: return ImageFont.truetype(path, font_size)
             except: continue
-    return ImageFont.load_default(size=font_size)
+    return ImageFont.load_default()
 
 font_title = get_scaled_font(70)
 font_week = get_scaled_font(44)
