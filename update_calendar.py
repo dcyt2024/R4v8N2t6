@@ -15,7 +15,7 @@ LOCAL_TZ = timezone(timedelta(hours=8))
 
 COLOR_BLACK = (0, 0, 0)
 COLOR_GRAY = (160, 160, 160)
-COLOR_RED = (255, 0, 0)        # 假期紅色
+COLOR_RED = (255, 0, 0)        # 假期顏色
 COLOR_LINE = (0, 160, 210)
 COLOR_ORANGE = (242, 133, 0)
 COLOR_WHITE = (255, 255, 255)
@@ -37,7 +37,7 @@ font_date = get_scaled_font(38)
 font_event = get_scaled_font(36)
 font_info = get_scaled_font(22)
 
-# ==================== 2. 完美繪圖邏輯 ====================
+# ==================== 2. 繪圖邏輯 ====================
 def generate_perfect_calendar(year, month, events, holiday_dates, filename):
     image = Image.new("RGB", (SCREEN_WIDTH, SCREEN_HEIGHT), COLOR_WHITE)
     draw = ImageDraw.Draw(image)
@@ -117,13 +117,8 @@ def generate_perfect_calendar(year, month, events, holiday_dates, filename):
             if cell_date.strftime("%Y-%m-%d") in events:
                 y_offset = y1 + 65 
                 for time_prefix, event_title, is_holiday_event in events[cell_date.strftime("%Y-%m-%d")]:
-                    
-                    if is_holiday_event:
-                        event_color = COLOR_RED
-                    elif "[SH]" in event_title:
-                        event_color = COLOR_ORANGE
-                    else:
-                        event_color = COLOR_BLACK if cell_date.month == month else COLOR_GRAY
+                    # 假期用紅色，普通事件用黑色
+                    event_color = COLOR_RED if is_holiday_event else (COLOR_BLACK if cell_date.month == month else COLOR_GRAY)
                         
                     time_width = draw.textlength(time_prefix, font=font_event) if time_prefix else 0
                     lines_info = split_event_smart(time_prefix, event_title, font_event, CELL_WIDTH - 30, time_width)
@@ -138,9 +133,12 @@ def generate_perfect_calendar(year, month, events, holiday_dates, filename):
 
 # ==================== 3. 主循環 ====================
 API_KEY = 'AIzaSyAYBpOB6UoMYeAAmwTM_1KdYEzwtv6zXiE'
-CALENDAR_IDS = [
-    'dcyt122024@gmail.com', 
-    'zh.hong_kong#holiday@group.v.calendar.google.com'
+
+# 設定你的日曆 ID，以及是否視為假期
+# 格式: (日曆ID, 是否視為假期)
+CALENDAR_CONFIG = [
+    ('dcyt122024@gmail.com', False), 
+    ('de06ed3354bfa3472551deb2e49510d6cb42c9870578bc7d54de341448565f73@group.calendar.google.com', True) 
 ]
 
 for i in range(6):
@@ -155,15 +153,13 @@ for i in range(6):
     events = {}
     holiday_dates = set() 
     
-    for cal_id in CALENDAR_IDS:
+    for cal_id, is_holiday_cal in CALENDAR_CONFIG:
         try:
             url = f"https://www.googleapis.com/calendar/v3/calendars/{urllib.parse.quote(cal_id)}/events?key={API_KEY}&timeMin={start_date.strftime('%Y-%m-%dT00:00:00Z')}&timeMax={end_date.strftime('%Y-%m-%dT00:00:00Z')}&singleEvents=true&orderBy=startTime&maxResults=250"
             with urllib.request.urlopen(url) as response:
                 data = json.loads(response.read().decode('utf-8'))
-                is_holiday_cal = 'holiday' in cal_id 
                 
                 for ev in data.get('items', []):
-                    # --- 改進：加入 Start/End 時間判斷 ---
                     start_dt = ev.get('start', {}).get('dateTime')
                     end_dt = ev.get('end', {}).get('dateTime')
                     
@@ -173,8 +169,8 @@ for i in range(6):
                     if is_holiday_cal:
                         holiday_dates.add(day)
                         
-                    # 如果有開始和結束時間，顯示 Start-End，否則只顯示開始時間
                     time_str = ""
+                    # 顯示開始-結束時間
                     if start_dt and end_dt:
                         time_str = f"{start_dt[11:16]}-{end_dt[11:16]} "
                     elif start_dt:
@@ -183,6 +179,7 @@ for i in range(6):
                     events[day].append((time_str, ev.get('summary', '(No title)'), is_holiday_cal))
         except Exception as e: print(f"API Error: {e}")
     
+    # 排序邏輯：假期事件永遠在最上面
     for day in events:
         events[day].sort(key=lambda x: x[2], reverse=True)
     
