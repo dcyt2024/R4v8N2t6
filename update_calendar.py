@@ -15,7 +15,7 @@ LOCAL_TZ = timezone(timedelta(hours=8))
 
 COLOR_BLACK = (0, 0, 0)
 COLOR_GRAY = (160, 160, 160)
-COLOR_RED = (255, 0, 0)        # 假期紅色
+COLOR_RED = (255, 0, 0)        # 假期與假期文字紅色
 COLOR_LINE = (0, 160, 210)
 COLOR_ORANGE = (242, 133, 0)
 COLOR_WHITE = (255, 255, 255)
@@ -117,7 +117,6 @@ def generate_perfect_calendar(year, month, events, holiday_dates, filename):
             
             if cell_date.strftime("%Y-%m-%d") in events:
                 y_offset = y1 + 65 
-                # 這裡改為取出 (time_prefix, event_title, is_holiday_event)
                 for time_prefix, event_title, is_holiday_event in events[cell_date.strftime("%Y-%m-%d")]:
                     
                     # 顏色邏輯：假期 -> 紅色，[SH] -> 橙色，否則依據是否當月
@@ -143,7 +142,7 @@ def generate_perfect_calendar(year, month, events, holiday_dates, filename):
 API_KEY = 'AIzaSyAYBpOB6UoMYeAAmwTM_1KdYEzwtv6zXiE'
 CALENDAR_IDS = [
     'dcyt122024@gmail.com', 
-    'zh-hk.hong_kong.official#holiday@group.v.calendar.google.com'
+    'zh.hong_kong#holiday@group.v.calendar.google.com'
 ]
 
 for i in range(6):
@@ -163,7 +162,7 @@ for i in range(6):
             url = f"https://www.googleapis.com/calendar/v3/calendars/{urllib.parse.quote(cal_id)}/events?key={API_KEY}&timeMin={start_date.strftime('%Y-%m-%dT00:00:00Z')}&timeMax={end_date.strftime('%Y-%m-%dT00:00:00Z')}&singleEvents=true&orderBy=startTime&maxResults=250"
             with urllib.request.urlopen(url) as response:
                 data = json.loads(response.read().decode('utf-8'))
-                is_holiday_cal = 'holiday' in cal_id # 標記此日曆是否為假期日曆
+                is_holiday_cal = 'holiday' in cal_id 
                 
                 for ev in data.get('items', []):
                     start = ev.get('start', {}).get('dateTime') or ev.get('start', {}).get('date')
@@ -178,9 +177,13 @@ for i in range(6):
                         t1 = start[11:16]
                         time_str = f"{t1} "
                     
-                    # 存入 tuple: (時間, 標題, 是否為假期)
                     events[day].append((time_str, ev.get('summary', '(No title)'), is_holiday_cal))
         except Exception as e: print(f"API Error: {e}")
+
+    # --- 新增：將該天行程排序，確保假期 (True) 排在個人行程 (False) 前面 ---
+    for day in events:
+        events[day].sort(key=lambda x: x[2], reverse=True)
     
     generate_perfect_calendar(y, m, events, holiday_dates, f"calendar{i+1}.png")
     print(f"✅ {y}-{m} 完美生成: calendar{i+1}.png")
+```[cite: 1]
