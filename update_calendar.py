@@ -129,7 +129,7 @@ def generate_perfect_calendar(year, month, events, filename):
     image.save(filename)
 
 # ==================== 3. 主循環 ====================
-API_KEY = 'IzaSyAYBpOB6UoMYeAAmwTM_1KdYEzwtv6zXiE'
+API_KEY = 'AIzaSyAYBpOB6UoMYeAAmwTM_1KdYEzwtv6zXiE'
 CALENDAR_ID = 'dcyt122024@gmail.com'
 
 for i in range(6):
