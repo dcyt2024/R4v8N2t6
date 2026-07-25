@@ -15,6 +15,7 @@ LOCAL_TZ = timezone(timedelta(hours=8))
 
 COLOR_BLACK = (0, 0, 0)
 COLOR_GRAY = (160, 160, 160)
+COLOR_RED = (255, 0, 0)        # 今日紅色
 COLOR_LINE = (0, 160, 210)
 COLOR_ORANGE = (242, 133, 0)
 COLOR_WHITE = (255, 255, 255)
@@ -64,8 +65,7 @@ def generate_perfect_calendar(year, month, events, filename):
 
     def split_event_smart(time_prefix, event_title, font, max_width, time_width):
         full_text = f"{time_prefix}{event_title}".strip()
-        if draw.textlength(full_text, font=font) <= max_width:
-            return [(full_text, False)]
+        if draw.textlength(full_text, font=font) <= max_width: return [(full_text, False)]
         words = []
         current_word = ""
         for char in event_title:
@@ -110,7 +110,9 @@ def generate_perfect_calendar(year, month, events, filename):
             draw.line([(x1, y2), (x2, y2)], fill=COLOR_LINE, width=4)
             if col == 0: draw.line([(x1, y1), (x1, y2)], fill=COLOR_LINE, width=4)
             
-            date_color = COLOR_BLACK if cell_date.month == month else COLOR_GRAY
+            # --- 繪製日期數字 (今天紅色) ---
+            is_today = (cell_date == datetime.now().date())
+            date_color = COLOR_RED if is_today else (COLOR_BLACK if cell_date.month == month else COLOR_GRAY)
             draw.text((x1 + 15, y1 + 12), str(cell_date.day), fill=date_color, font=font_date)
             
             if cell_date.strftime("%Y-%m-%d") in events:
@@ -129,36 +131,37 @@ def generate_perfect_calendar(year, month, events, filename):
     image.save(filename)
 
 # ==================== 3. 主循環 ====================
-API_KEY = 'AIzaSyAYBpOB6UoMYeAAmwTM_1KdYEzwtv6zXiE'
-CALENDAR_ID = 'dcyt122024@gmail.com'
+API_KEY = 'AIzaSyAYBpOB6UoMYeAAmwTM_1KdYEzwtv6zXiE' # 請填入你的 API KEY
+CALENDAR_IDS = [
+    'dcyt122024@gmail.com', # 你的個人日曆
+    'zh-hk.hong_kong.official#holiday@group.v.calendar.google.com' # 香港假期日曆
+]
 
 for i in range(6):
     target = datetime.now() + timedelta(days=i*30)
     y, m = target.year, target.month
     
-    # 擴展查詢範圍：往前與往後各加 7 天
     start_date = datetime(y, m, 1) - timedelta(days=7)
     next_m = m + 1 if m < 12 else 1
     next_y = y if m < 12 else y + 1
     end_date = datetime(next_y, next_m, 1) + timedelta(days=7)
     
     events = {}
-    try:
-        url = f"https://www.googleapis.com/calendar/v3/calendars/{urllib.parse.quote(CALENDAR_ID)}/events?key={API_KEY}&timeMin={start_date.strftime('%Y-%m-%dT00:00:00Z')}&timeMax={end_date.strftime('%Y-%m-%dT00:00:00Z')}&singleEvents=true&orderBy=startTime&maxResults=250"
-        with urllib.request.urlopen(url) as response:
-            data = json.loads(response.read().decode('utf-8'))
-            for ev in data.get('items', []):
-                start = ev.get('start', {}).get('dateTime') or ev.get('start', {}).get('date')
-                end = ev.get('end', {}).get('dateTime') or ev.get('end', {}).get('date')
-                day = start[:10]
-                if day not in events: events[day] = []
-                time_str = ""
-                if 'dateTime' in ev.get('start', {}):
-                    t1 = start[11:16]
-                    t2 = end[11:16] if end else ""
-                    time_str = f"{t1}-{t2} " if t2 else f"{t1} "
-                events[day].append((time_str, ev.get('summary', '(No title)')))
-    except Exception as e: print(f"API Error: {e}")
+    for cal_id in CALENDAR_IDS:
+        try:
+            url = f"https://www.googleapis.com/calendar/v3/calendars/{urllib.parse.quote(cal_id)}/events?key={API_KEY}&timeMin={start_date.strftime('%Y-%m-%dT00:00:00Z')}&timeMax={end_date.strftime('%Y-%m-%dT00:00:00Z')}&singleEvents=true&orderBy=startTime&maxResults=250"
+            with urllib.request.urlopen(url) as response:
+                data = json.loads(response.read().decode('utf-8'))
+                for ev in data.get('items', []):
+                    start = ev.get('start', {}).get('dateTime') or ev.get('start', {}).get('date')
+                    day = start[:10]
+                    if day not in events: events[day] = []
+                    time_str = ""
+                    if 'dateTime' in ev.get('start', {}):
+                        t1 = start[11:16]
+                        time_str = f"{t1} "
+                    events[day].append((time_str, ev.get('summary', '(No title)')))
+        except Exception as e: print(f"API Error: {e}")
     
     generate_perfect_calendar(y, m, events, f"calendar{i+1}.png")
     print(f"✅ {y}-{m} 完美生成: calendar{i+1}.png")
