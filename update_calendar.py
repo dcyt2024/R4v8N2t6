@@ -15,7 +15,7 @@ LOCAL_TZ = timezone(timedelta(hours=8))
 
 COLOR_BLACK = (0, 0, 0)
 COLOR_GRAY = (160, 160, 160)
-COLOR_RED = (255, 0, 0)        # 假期與假期文字紅色
+COLOR_RED = (255, 0, 0)        # 假期紅色
 COLOR_LINE = (0, 160, 210)
 COLOR_ORANGE = (242, 133, 0)
 COLOR_WHITE = (255, 255, 255)
@@ -110,7 +110,6 @@ def generate_perfect_calendar(year, month, events, holiday_dates, filename):
             draw.line([(x1, y2), (x2, y2)], fill=COLOR_LINE, width=4)
             if col == 0: draw.line([(x1, y1), (x1, y2)], fill=COLOR_LINE, width=4)
             
-            # --- 日期數字：只判斷是否為假期變紅 ---
             is_holiday = (cell_date.strftime("%Y-%m-%d") in holiday_dates)
             date_color = COLOR_RED if is_holiday else (COLOR_BLACK if cell_date.month == month else COLOR_GRAY)
             draw.text((x1 + 15, y1 + 12), str(cell_date.day), fill=date_color, font=font_date)
@@ -119,7 +118,6 @@ def generate_perfect_calendar(year, month, events, holiday_dates, filename):
                 y_offset = y1 + 65 
                 for time_prefix, event_title, is_holiday_event in events[cell_date.strftime("%Y-%m-%d")]:
                     
-                    # 顏色邏輯：假期 -> 紅色，[SH] -> 橙色，否則依據是否當月
                     if is_holiday_event:
                         event_color = COLOR_RED
                     elif "[SH]" in event_title:
@@ -179,11 +177,11 @@ for i in range(6):
                     
                     events[day].append((time_str, ev.get('summary', '(No title)'), is_holiday_cal))
         except Exception as e: print(f"API Error: {e}")
-
-    # --- 新增：將該天行程排序，確保假期 (True) 排在個人行程 (False) 前面 ---
+    
+    # --- 新增的排序邏輯 ---
+    # 對每一天的事件進行排序，is_holiday_cal 為 True 的會排在前面
     for day in events:
         events[day].sort(key=lambda x: x[2], reverse=True)
     
     generate_perfect_calendar(y, m, events, holiday_dates, f"calendar{i+1}.png")
     print(f"✅ {y}-{m} 完美生成: calendar{i+1}.png")
-```[cite: 1]
