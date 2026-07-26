@@ -109,14 +109,22 @@ def generate_perfect_calendar(year, month, events, holiday_dates, filename):
             x1, y1 = col * CELL_WIDTH, TOPBAR_HEIGHT + DOW_HEIGHT + (row * CELL_HEIGHT)
             x2, y2 = x1 + CELL_WIDTH, y1 + CELL_HEIGHT
             
-            draw.line([(x2, y1), (x2, y2)], fill=COLOR_LINE, width=4)
-            draw.line([(x1, y2), (x2, y2)], fill=COLOR_LINE, width=4)
-            if col == 0: draw.line([(x1, y1), (x1, y2)], fill=COLOR_LINE, width=4)
+            # --- 修正邊界：針對最左、最右及最後一列進行線條內縮 ---
+            draw_x2 = x2 - 2 if col == 6 else x2
+            draw.line([(draw_x2, y1), (draw_x2, y2)], fill=COLOR_LINE, width=4)
             
+            draw_y2 = y2 - 2 if row == 4 else y2
+            draw.line([(x1, draw_y2), (x2, draw_y2)], fill=COLOR_LINE, width=4)
+            
+            if col == 0: 
+                draw.line([(x1 + 2, y1), (x1 + 2, y2)], fill=COLOR_LINE, width=4)
+            
+            # 日期數字
             is_holiday = (cell_date.strftime("%Y-%m-%d") in holiday_dates)
             date_color = COLOR_RED if is_holiday else (COLOR_BLACK if cell_date.month == month else COLOR_GRAY)
             draw.text((x1 + 15, y1 + 12), str(cell_date.day), fill=date_color, font=font_date)
             
+            # 行程文字
             if cell_date.strftime("%Y-%m-%d") in events:
                 y_offset = y1 + 65 
                 for time_prefix, event_title, is_holiday_event in events[cell_date.strftime("%Y-%m-%d")]:
