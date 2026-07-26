@@ -16,7 +16,7 @@ LOCAL_TZ = timezone(timedelta(hours=8))
 COLOR_BLACK = (0, 0, 0)
 COLOR_GRAY = (160, 160, 160)
 COLOR_RED = (255, 0, 0)        # 假期顏色
-COLOR_LINE = (0, 0, 0)         # 修改：格線改為黑色
+COLOR_LINE = (0, 160, 210)     # 修改：格線改回淺藍色
 COLOR_ORANGE = (242, 133, 0)   # [SH] 橙色
 COLOR_WHITE = (255, 255, 255)
 
@@ -36,7 +36,7 @@ def get_scaled_font(font_size):
 
 font_title = get_scaled_font(70)
 font_week = get_scaled_font(44)
-font_date = get_scaled_font(46) # 修改：日期字體加大
+font_date = get_scaled_font(46) # 日期已加大
 font_event = get_scaled_font(36)
 font_info = get_scaled_font(22)
 
@@ -109,7 +109,7 @@ def generate_perfect_calendar(year, month, events, holiday_dates, filename):
             x1, y1 = col * CELL_WIDTH, TOPBAR_HEIGHT + DOW_HEIGHT + (row * CELL_HEIGHT)
             x2, y2 = x1 + CELL_WIDTH, y1 + CELL_HEIGHT
             
-            # --- 修正邊界：黑色線條 ---
+            # 繪製淺藍色格線
             draw_x2 = x2 - 2 if col == 6 else x2
             draw.line([(draw_x2, y1), (draw_x2, y2)], fill=COLOR_LINE, width=4)
             
@@ -126,16 +126,11 @@ def generate_perfect_calendar(year, month, events, holiday_dates, filename):
             
             # 行程文字
             if cell_date.strftime("%Y-%m-%d") in events:
-                y_offset = y1 + 75 # 稍微向下調整以適應更大的日期字體
+                y_offset = y1 + 75
                 for time_prefix, event_title, is_holiday_event in events[cell_date.strftime("%Y-%m-%d")]:
-                    
-                    # 顏色邏輯：假期 > [SH] > 普通
-                    if is_holiday_event:
-                        event_color = COLOR_RED
-                    elif "[SH]" in event_title:
-                        event_color = COLOR_ORANGE
-                    else:
-                        event_color = COLOR_BLACK if cell_date.month == month else COLOR_GRAY
+                    if is_holiday_event: event_color = COLOR_RED
+                    elif "[SH]" in event_title: event_color = COLOR_ORANGE
+                    else: event_color = COLOR_BLACK if cell_date.month == month else COLOR_GRAY
                         
                     time_width = draw.textlength(time_prefix, font=font_event) if time_prefix else 0
                     lines_info = split_event_smart(time_prefix, event_title, font_event, CELL_WIDTH - 30, time_width)
@@ -149,7 +144,7 @@ def generate_perfect_calendar(year, month, events, holiday_dates, filename):
     image.save(filename)
 
 # ==================== 3. 主循環 ====================
-API_KEY = 'AIzaSyAYBpOB6UoMYeAAmwTM_1KdYEzwtv6zXiE' # 請填入您的 API KEY
+API_KEY = 'AIzaSyAYBpOB6UoMYeAAmwTM_1KdYEzwtv6zXiE' 
 
 CALENDAR_CONFIG = [
     ('dcyt122024@gmail.com', False), 
