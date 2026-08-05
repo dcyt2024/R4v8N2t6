@@ -16,7 +16,7 @@ LOCAL_TZ = timezone(timedelta(hours=8))
 COLOR_BLACK = (0, 0, 0)
 COLOR_GRAY = (160, 160, 160)
 COLOR_RED = (255, 0, 0)        # 假期顏色
-COLOR_LINE = (0, 160, 210)     # 修改：格線改回淺藍色
+COLOR_LINE = (0, 160, 210)     # 淺藍色格線
 COLOR_ORANGE = (242, 133, 0)   # [SH] 橙色
 COLOR_WHITE = (255, 255, 255)
 
@@ -36,7 +36,7 @@ def get_scaled_font(font_size):
 
 font_title = get_scaled_font(70)
 font_week = get_scaled_font(44)
-font_date = get_scaled_font(46) # 日期已加大
+font_date = get_scaled_font(46) # 加大日期字體
 font_event = get_scaled_font(36)
 font_info = get_scaled_font(22)
 
@@ -109,7 +109,7 @@ def generate_perfect_calendar(year, month, events, holiday_dates, filename):
             x1, y1 = col * CELL_WIDTH, TOPBAR_HEIGHT + DOW_HEIGHT + (row * CELL_HEIGHT)
             x2, y2 = x1 + CELL_WIDTH, y1 + CELL_HEIGHT
             
-            # 繪製淺藍色格線
+            # 繪製淺藍色格線（含邊界修正）
             draw_x2 = x2 - 2 if col == 6 else x2
             draw.line([(draw_x2, y1), (draw_x2, y2)], fill=COLOR_LINE, width=4)
             
@@ -151,9 +151,13 @@ CALENDAR_CONFIG = [
     ('de06ed3354bfa3472551deb2e49510d6cb42c9870578bc7d54de341448565f73@group.calendar.google.com', True) 
 ]
 
+# 修正：精準計算未來 6 個月（不會再發生漏掉跨年月份的問題）
+now = datetime.now()
+
 for i in range(6):
-    target = datetime.now() + timedelta(days=i*30)
-    y, m = target.year, target.month
+    target_month = now.month + i
+    y = now.year + (target_month - 1) // 12
+    m = (target_month - 1) % 12 + 1
     
     start_date = datetime(y, m, 1) - timedelta(days=7)
     next_m = m + 1 if m < 12 else 1
